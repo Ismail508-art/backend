@@ -18,7 +18,7 @@ import com.itextpdf.layout.element.Paragraph;
 
 @RestController
 @RequestMapping("/api/appointments")
-@CrossOrigin(origins = "https://myqmulticare.com") // your live domain
+@CrossOrigin(origins = "https://react-frontend-theta-two.vercel.app") // your live domain
 public class AppointmentController {
 
     private final AppointmentRepository appointmentRepository;
