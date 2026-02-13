@@ -20,8 +20,10 @@ public class CorsConfig {
         config.setAllowedOrigins(List.of(
         	    "http://localhost:5173",
         	    "https://myqmulticare.com",
+        	    "https://www.myqmulticare.com", // add this
         	    "https://react-frontend-theta-two.vercel.app"
         	));
+
         // ✅ Allowed HTTP methods
         config.setAllowedMethods(List.of(
             "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
