@@ -18,10 +18,10 @@ public class CorsConfig {
 
         // ✅ Frontend URLs – localhost for dev + live domain
         config.setAllowedOrigins(List.of(
-            "http://localhost:5173",
-            "https://myqmulticare.com"
-        ));
-
+        	    "http://localhost:5173",
+        	    "https://myqmulticare.com",
+        	    "https://react-frontend-theta-two.vercel.app"
+        	));
         // ✅ Allowed HTTP methods
         config.setAllowedMethods(List.of(
             "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
