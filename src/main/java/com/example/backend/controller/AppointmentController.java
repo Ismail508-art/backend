@@ -19,6 +19,7 @@ import com.itextpdf.layout.element.Paragraph;
 @RestController
 @RequestMapping("/api/appointments")
 @CrossOrigin(origins = "https://react-frontend-theta-two.vercel.app") // your live domain
+
 public class AppointmentController {
 
     private final AppointmentRepository appointmentRepository;
@@ -58,6 +59,14 @@ public class AppointmentController {
 
         if (!"PENDING".equals(appointment.getPaymentStatus())) {
             throw new RuntimeException("Payment already processed or invalid status");
+        }
+
+     // ✅ Check if transactionId is already used
+        if (request.getTransactionId() != null && !request.getTransactionId().isEmpty()) {
+            appointmentRepository.findByTransactionId(request.getTransactionId())
+                .ifPresent(a -> {
+                    throw new RuntimeException("Transaction ID already used for another appointment");
+                });
         }
 
         appointment.setPaymentStatus("CONFIRMED");
