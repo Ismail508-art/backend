@@ -25,9 +25,8 @@ public class PasswordResetService {
     private PasswordResetTokenRepository tokenRepository;
 
     @Autowired(required = false)
-    private JavaMailSender mailSender; // can be null in dev
+    private JavaMailSender mailSender; // may be null in dev
 
-    // 🔹 Environment variable to check dev/prod
     @Value("${spring.profiles.active:dev}")
     private String activeProfile;
 
@@ -38,7 +37,7 @@ public class PasswordResetService {
 
         User user = userOpt.get();
 
-        // Check if token already exists
+        // Check for existing token
         Optional<PasswordResetToken> existingTokenOpt = tokenRepository.findByUser(user);
 
         PasswordResetToken resetToken = existingTokenOpt
@@ -55,23 +54,22 @@ public class PasswordResetService {
                     return tokenRepository.save(token);
                 });
 
-        // Build reset URL
         String resetUrl = "http://localhost:5173/reset-password?token=" + resetToken.getToken();
 
         if ("prod".equalsIgnoreCase(activeProfile) && mailSender != null) {
-            // ✅ Send real email in production
+            // ✅ Production: send real email
             try {
                 SimpleMailMessage message = new SimpleMailMessage();
                 message.setTo(user.getEmail());
                 message.setSubject("Password Reset Request");
-                message.setText("Click this link to reset your password:\n\n" + resetUrl);
+                message.setText("Hello " + user.getName() + ",\n\nClick this link to reset your password:\n\n" + resetUrl);
                 mailSender.send(message);
             } catch (Exception e) {
                 e.printStackTrace();
-                return false; // failed to send email
+                return false; // Email sending failed
             }
         } else {
-            // 🔹 Dev: just print to console
+            // 🔹 Dev: just print link
             System.out.println("Password reset link (dev): " + resetUrl);
         }
 
@@ -88,7 +86,7 @@ public class PasswordResetService {
         if (resetToken.getExpiryDate().isBefore(LocalDateTime.now())) return false;
 
         User user = resetToken.getUser();
-        user.setPassword(newPassword); // ideally hash password
+        user.setPassword(newPassword); // Ideally, hash password in production
         userRepository.save(user);
 
         tokenRepository.delete(resetToken);

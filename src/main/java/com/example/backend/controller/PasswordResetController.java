@@ -15,16 +15,16 @@ public class PasswordResetController {
     @Autowired
     private PasswordResetService passwordResetService;
 
-    // 🔹 Request password reset
+    // Request password reset
     @PostMapping("/forgot-password")
     public ResponseEntity<String> forgotPassword(@RequestBody Map<String, String> request) {
         String email = request.get("email");
         boolean sent = passwordResetService.generateResetTokenAndSendEmail(email);
         if (sent) return ResponseEntity.ok("Reset link sent to your email");
-        return ResponseEntity.badRequest().body("Email not found");
+        return ResponseEntity.badRequest().body("Email not found or failed to send");
     }
 
-    // 🔹 Reset password using token
+    // Reset password using token
     @PostMapping("/reset-password")
     public ResponseEntity<String> resetPassword(@RequestBody Map<String, String> request) {
         String token = request.get("token");
