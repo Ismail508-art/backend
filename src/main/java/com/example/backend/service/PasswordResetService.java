@@ -5,6 +5,7 @@ import com.example.backend.model.User;
 import com.example.backend.repository.PasswordResetTokenRepository;
 import com.example.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
@@ -23,10 +24,13 @@ public class PasswordResetService {
     @Autowired
     private PasswordResetTokenRepository tokenRepository;
 
-    @Autowired
-    private JavaMailSender mailSender; // 🔹 Added for sending emails
+    @Autowired(required = false)
+    private JavaMailSender mailSender; // can be null in dev
 
-    // 🔹 Generate token and send email
+    // 🔹 Environment variable to check dev/prod
+    @Value("${spring.profiles.active:dev}")
+    private String activeProfile;
+
     @Transactional
     public boolean generateResetTokenAndSendEmail(String email) {
         Optional<User> userOpt = userRepository.findByEmail(email);
@@ -39,13 +43,11 @@ public class PasswordResetService {
 
         PasswordResetToken resetToken = existingTokenOpt
                 .map(token -> {
-                    // Update existing token
                     token.setToken(UUID.randomUUID().toString());
                     token.setExpiryDate(LocalDateTime.now().plusHours(1));
                     return tokenRepository.save(token);
                 })
                 .orElseGet(() -> {
-                    // Create new token
                     PasswordResetToken token = new PasswordResetToken();
                     token.setUser(user);
                     token.setToken(UUID.randomUUID().toString());
@@ -53,19 +55,29 @@ public class PasswordResetService {
                     return tokenRepository.save(token);
                 });
 
-        // 🔹 Send real email
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(user.getEmail());
-        message.setSubject("Reset your password");
-        message.setText("Click this link to reset your password: http://localhost:5173/reset-password?token=" 
-                        + resetToken.getToken());
+        // Build reset URL
+        String resetUrl = "http://localhost:5173/reset-password?token=" + resetToken.getToken();
 
-        mailSender.send(message);
+        if ("prod".equalsIgnoreCase(activeProfile) && mailSender != null) {
+            // ✅ Send real email in production
+            try {
+                SimpleMailMessage message = new SimpleMailMessage();
+                message.setTo(user.getEmail());
+                message.setSubject("Password Reset Request");
+                message.setText("Click this link to reset your password:\n\n" + resetUrl);
+                mailSender.send(message);
+            } catch (Exception e) {
+                e.printStackTrace();
+                return false; // failed to send email
+            }
+        } else {
+            // 🔹 Dev: just print to console
+            System.out.println("Password reset link (dev): " + resetUrl);
+        }
 
         return true;
     }
 
-    // 🔹 Reset password using token
     @Transactional
     public boolean resetPassword(String token, String newPassword) {
         Optional<PasswordResetToken> tokenOpt = tokenRepository.findByToken(token);
@@ -76,10 +88,9 @@ public class PasswordResetService {
         if (resetToken.getExpiryDate().isBefore(LocalDateTime.now())) return false;
 
         User user = resetToken.getUser();
-        user.setPassword(newPassword); // 🔹 Ideally hash password
+        user.setPassword(newPassword); // ideally hash password
         userRepository.save(user);
 
-        // Delete token after use
         tokenRepository.delete(resetToken);
 
         return true;
