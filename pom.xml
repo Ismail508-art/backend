@@ -57,11 +57,11 @@
              <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
           
-          <!-- Mail (SMTP) -->
         <dependency>
-             <groupId>org.springframework.boot</groupId>
-             <artifactId>spring-boot-starter-mail</artifactId>
+               <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+
 
         
         

@@ -6,10 +6,10 @@ import com.example.backend.repository.PasswordResetTokenRepository;
 import com.example.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -24,11 +24,12 @@ public class PasswordResetService {
     @Autowired
     private PasswordResetTokenRepository tokenRepository;
 
-    @Autowired(required = false)
-    private JavaMailSender mailSender; // may be null in dev
+    // Brevo API Key from environment variable
+    @Value("${BREVO_API_KEY}")
+    private String brevoApiKey;
 
-    @Value("${spring.profiles.active:dev}")
-    private String activeProfile;
+    @Value("${FRONTEND_URL:http://localhost:5173}")
+    private String frontendUrl;
 
     @Transactional
     public boolean generateResetTokenAndSendEmail(String email) {
@@ -37,7 +38,7 @@ public class PasswordResetService {
 
         User user = userOpt.get();
 
-        // Check for existing token
+        // Check if token already exists
         Optional<PasswordResetToken> existingTokenOpt = tokenRepository.findByUser(user);
 
         PasswordResetToken resetToken = existingTokenOpt
@@ -54,26 +55,34 @@ public class PasswordResetService {
                     return tokenRepository.save(token);
                 });
 
-        String resetUrl = "http://localhost:5173/reset-password?token=" + resetToken.getToken();
+        // Build reset URL
+        String resetUrl = frontendUrl + "/reset-password?token=" + resetToken.getToken();
 
-        if ("prod".equalsIgnoreCase(activeProfile) && mailSender != null) {
-            // ✅ Production: send real email
-            try {
-                SimpleMailMessage message = new SimpleMailMessage();
-                message.setTo(user.getEmail());
-                message.setSubject("Password Reset Request");
-                message.setText("Hello " + user.getName() + ",\n\nClick this link to reset your password:\n\n" + resetUrl);
-                mailSender.send(message);
-            } catch (Exception e) {
-                e.printStackTrace();
-                return false; // Email sending failed
-            }
-        } else {
-            // 🔹 Dev: just print link
-            System.out.println("Password reset link (dev): " + resetUrl);
+        try {
+            RestTemplate restTemplate = new RestTemplate();
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("api-key", brevoApiKey);
+
+            String json = """
+                {
+                  "sender": { "name": "MyClinic", "email": "no-reply@myclinic.com" },
+                  "to": [{"email": "%s"}],
+                  "subject": "Password Reset Request",
+                  "htmlContent": "<p>Click this link to reset your password: <a href='%s'>Reset Password</a></p>"
+                }
+            """.formatted(email, resetUrl);
+
+            HttpEntity<String> request = new HttpEntity<>(json, headers);
+            ResponseEntity<String> response = restTemplate.postForEntity(
+                    "https://api.brevo.com/v3/smtp/email", request, String.class
+            );
+
+            return response.getStatusCode().is2xxSuccessful();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
         }
-
-        return true;
     }
 
     @Transactional
@@ -82,15 +91,13 @@ public class PasswordResetService {
         if (tokenOpt.isEmpty()) return false;
 
         PasswordResetToken resetToken = tokenOpt.get();
-
         if (resetToken.getExpiryDate().isBefore(LocalDateTime.now())) return false;
 
         User user = resetToken.getUser();
-        user.setPassword(newPassword); // Ideally, hash password in production
+        user.setPassword(newPassword); // You can hash this if needed
         userRepository.save(user);
 
         tokenRepository.delete(resetToken);
-
         return true;
     }
 }
