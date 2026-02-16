@@ -5,6 +5,8 @@ import com.example.backend.model.User;
 import com.example.backend.repository.PasswordResetTokenRepository;
 import com.example.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,7 +23,10 @@ public class PasswordResetService {
     @Autowired
     private PasswordResetTokenRepository tokenRepository;
 
-    // 🔹 Generate token and "send email"
+    @Autowired
+    private JavaMailSender mailSender; // 🔹 Added for sending emails
+
+    // 🔹 Generate token and send email
     @Transactional
     public boolean generateResetTokenAndSendEmail(String email) {
         Optional<User> userOpt = userRepository.findByEmail(email);
@@ -48,8 +53,14 @@ public class PasswordResetService {
                     return tokenRepository.save(token);
                 });
 
-        // 🔹 TODO: Send token link via email (e.g., example.com/reset-password?token=xxx)
-        System.out.println("Password reset link: http://localhost:5173/reset-password?token=" + resetToken.getToken());
+        // 🔹 Send real email
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(user.getEmail());
+        message.setSubject("Reset your password");
+        message.setText("Click this link to reset your password: http://localhost:5173/reset-password?token=" 
+                        + resetToken.getToken());
+
+        mailSender.send(message);
 
         return true;
     }
